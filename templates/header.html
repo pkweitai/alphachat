@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Chat Widget</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/storyflix-style.css') }}">
+    <meta name="google-site-verification" content="LEo7F9NCNvw_OEyrKWqhXNudrx14UBowwXBKkKJIiyM" />
+</head>
+<body>
+
+<header class="header">
+    <a href="/"><img src="{{ url_for('static', filename='images/logo2.png') }}" alt="Logo"></a>
+    <div class="nav-links">
+        <a href="/m1">Live Demo</a>
+        <a href="/investor">Investor</a>
+    </div>
+
+    <button class="chat-button" onclick="toggleChatWidget()">
+        <img src="{{ url_for('static', filename='images/chat-icon.png') }}" alt="Chat with us"> <!-- Replace with your image URL -->
+    </button>
+    <div class="chat-widget" id="chatWidget">
+        <div class="chat-widget-header" onclick="toggleChatWidget()">How can I help?</div>
+        <div class="chat-widget-body">
+            <div class="chat-widget-messages" id="chatMessages"></div>
+            <div class="chat-widget-input">
+                <input type="text" id="chatInput" placeholder="Type a message...">
+                <button onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+</header>
+
+<script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-YFHG065NPZ"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-YFHG065NPZ');
+
+
+  // Function to handle button clicks
+  function handleButtonClick(event) {
+    // Get the clicked element
+    const target = event.target;
+    
+    // Check if the clicked element is a button
+    if (target.tagName.toLowerCase() === 'button') {
+      // Get button details
+      const buttonId = target.id || 'no-id';
+      const buttonText = target.innerText || 'no-text';
+
+      // Send event to Google Analytics
+      gtag('event', 'click', {
+        'event_category': 'Button',
+        'event_label': buttonText,
+        'event_id': buttonId
+      });
+    }
+  }
+
+  // Attach event listener to the document for click events
+  document.addEventListener('click', handleButtonClick);
+
+
+    //const socket = io();
+
+    let defaultMessageShown = false;
+
+    function toggleChatWidget() {
+        const chatWidget = document.getElementById('chatWidget');
+        const chatMessages = document.getElementById('chatMessages');
+        const chatInput = document.getElementById('chatInput');
+        const isHidden = chatWidget.style.display === 'none' || chatWidget.style.display === '';
+
+        if (isHidden) {
+            chatWidget.style.display = 'flex';
+            chatInput.focus();  // Set focus to the input box
+            // Add default message if the chat is opened for the first time
+            if (!defaultMessageShown) {
+                const defaultMessage = "Hey there! I am an AI Assistance and is still learning tons information everyday. Let me know what I can help? Meantime,please signup <a href='http://storyflix.live/investor'>here</a> for more updates";
+                const messageElement = document.createElement('div');
+                messageElement.classList.add('chat-widget-message', 'server');
+                messageElement.innerHTML = defaultMessage;  // Use innerHTML to include HTML content
+                chatMessages.appendChild(messageElement);
+                // Scroll to the bottom
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                defaultMessageShown = true;
+            }
+        } else {
+            chatWidget.style.display = 'none';
+        }
+    }
+
+
+    function sendMessage() {
+    const chatInput = document.getElementById('chatInput');
+    const message = chatInput.value.trim();
+    if (message === '') return;
+
+    const chatMessages = document.getElementById('chatMessages');
+
+    // Display the message in the chat window with "You:" prefix
+    const messageElement = document.createElement('div');
+    messageElement.classList.add('chat-widget-message', 'you');
+    messageElement.textContent = `You: ${message}`;
+    chatMessages.appendChild(messageElement);
+
+    // Clear the input
+    chatInput.value = '';
+
+    // Scroll to the bottom of the chat messages
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    // Send the message to the server via HTTP POST
+    fetch('/chat', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ message: message })
+    })
+    .then(response => response.json())
+    .then(data => {
+        // Display the response message in the chat window
+        const responseElement = document.createElement('div');
+        responseElement.classList.add('chat-widget-message', 'server');
+        responseElement.innerHTML = data.msg;  // Use innerHTML to render HTML response
+        chatMessages.appendChild(responseElement);
+
+        // Scroll to the bottom of the chat messages
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
+}
+
+
+/*
+
+    function ws_sendMessage() {
+        const chatInput = document.getElementById('chatInput');
+        const message = chatInput.value.trim();
+        if (message === '') return;
+
+        const chatMessages = document.getElementById('chatMessages');
+
+        // Display the message in the chat window with "You:" prefix
+        const messageElement = document.createElement('div');
+        messageElement.classList.add('chat-widget-message', 'you');
+        messageElement.textContent = `${message}`;
+        chatMessages.appendChild(messageElement);
+
+        // Clear the input
+        chatInput.value = '';
+
+        // Scroll to the bottom of the chat messages
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        // Send the message to the server via Socket.IO
+        socket.emit('send_message', { message });
+    }
+    
+    // Receive response from server via Socket.IO
+    socket.on('receive_message', function(data) {
+        const chatMessages = document.getElementById('chatMessages');
+
+        // Display the response message in the chat window
+        const responseElement = document.createElement('div');
+        responseElement.classList.add('chat-widget-message', 'server');
+        responseElement.textContent = data.response;
+        chatMessages.appendChild(responseElement);
+
+        // Scroll to the bottom of the chat messages
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    });
+
+    */
+
+    // Close the chat widget when the ESC key is pressed
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            const chatWidget = document.getElementById('chatWidget');
+            if (chatWidget.style.display === 'flex') {
+                chatWidget.style.display = 'none';
+            }
+        }
+    });
+
+    // Send message on Enter key press
+    document.getElementById('chatInput').addEventListener('keypress', function(event) {
+        if (event.key === 'Enter') {
+            sendMessage();
+        }
+    });
+
+    // Close the chat widget when clicking or touching outside of it
+    document.addEventListener('click', function(event) {
+        const chatWidget = document.getElementById('chatWidget');
+        if (chatWidget.style.display === 'flex' && !chatWidget.contains(event.target) && !document.querySelector('.chat-button').contains(event.target)) {
+            chatWidget.style.display = 'none';
+        }
+    });
+
+    document.addEventListener('touchstart', function(event) {
+        const chatWidget = document.getElementById('chatWidget');
+        if (chatWidget.style.display === 'flex' && !chatWidget.contains(event.target) && !document.querySelector('.chat-button').contains(event.target)) {
+            chatWidget.style.display = 'none';
+        }
+    });
+</script>
+
+</body>
+</html>

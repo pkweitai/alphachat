@@ -1,0 +1,135 @@
+body {
+    background-color: #141414;
+    color: #e5e5e5;
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+}
+.container {
+    margin: 20px;
+}
+.row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+}
+.row > * {
+    margin-right: 20px;
+}
+#displayArea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #333;
+    min-height: 200px;
+    white-space: pre-wrap;
+    background-color: #181818;
+    color: #e5e5e5; /* Ensure text is visible */
+    margin-top: 20px;
+}
+#youtubeContainer {
+    margin-bottom: 20px;
+}
+iframe {
+    width: 100%;
+    height: 315px;
+}
+#youtubeLink {
+    width: 100%;
+    padding: 10px;
+    font-size: 16px;
+    background-color: #333;
+    border: 1px solid #333;
+    color: #e5e5e5;
+}
+#slidersContainer {
+    margin-top: 10px;
+}
+#slidersContainer label {
+    display: block;
+    margin-bottom: 5px;
+}
+#audioPreviewContainer {
+    margin-top: 20px;
+}
+button {
+    padding: 10px 20px;
+    background-color: #e50914;
+    color: #e5e5e5;
+    border: none;
+    cursor: pointer;
+}
+button:hover {
+    background-color: #b20710;
+}
+button:disabled {
+    background-color: #333;
+    cursor: not-allowed;
+}
+#spinner {
+    display: none;
+    border: 4px solid #e5e5e5;
+    border-top: 4px solid #333;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 9999;
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+#overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 9998;
+}
+#notificationBar {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background-color: #e50914;
+    color: #e5e5e5;
+    text-align: center;
+    padding: 10px;
+    z-index: 10000;
+}
+#startSlider, #endSlider {
+    width: 100%;
+    position: relative;
+
+}
+
+button#recordLiveButton {
+    background-color: #1db954; /* Spotify green, just as an example */
+    color: #ffffff;
+}
+
+button#recordLiveButton:hover {
+    background-color: #1aa34a;
+}
+
+/* Add this to your existing CSS file */
+
+@keyframes flash-red-green {
+    0% { background-color: #e50914; }
+    50% { background-color: #00ff00; }
+    100% { background-color: #e50914; }
+}
+
+button#recordLiveButton.flashing {
+    animation: flash-red-green 1s infinite;
+    color: #ffffff;
+    border: none;
+}

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo Live</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/storyflix-style.css') }}">
+</head>
+<body>
+
+    <div class="background-image"></div>
+    <div class="container">
+        {% include 'header_demo.html' %}
+
+            <h2>CS Chatbot Sample</h2>
+            <textarea id="chatPrompt" placeholder="Type your template here..." style="left:0px; width: 50%; height: 60%;"></textarea>
+            <button id="saveButton">Save Template</button>
+    
+
+       
+
+       
+        {% include 'footer.html' %}
+    </div>
+
+    <script>
+        document.getElementById("saveButton").addEventListener("click", function () {
+            const promptText = document.getElementById("chatPrompt").value;
+
+            fetch("/save_prompt", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ prompt: promptText })
+            })
+            .then(response => response.json())
+            .then(data => console.log(data.message))
+            .catch(error => console.error("Error saving prompt:", error));
+        });
+
+        document.addEventListener("DOMContentLoaded", function() {
+            
+            const menuIcon = document.querySelector('.header .menu-icon');
+    
+        // Load saved prompt from the backend
+        fetch("/get_prompt")
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("chatPrompt").value = data.prompt || "";
+            })
+            .catch(error => console.error("Error loading prompt:", error));
+
+
+
+            function moveNavLinks() {
+                if (window.innerWidth <= 768) {
+                    subscribeDiv.appendChild(navLinks);
+                } else {
+                    document.querySelector('.header').appendChild(navLinks);
+                }
+            }
+    
+            function toggleMenu() {
+                navLinks.classList.toggle('show');
+            }
+    
+            menuIcon.addEventListener('click', toggleMenu);
+            window.addEventListener('resize', moveNavLinks);
+            moveNavLinks();
+    
+            cells.forEach(cell => {
+                cell.addEventListener('mouseover', function() {
+                    const index = Array.prototype.indexOf.call(cell.parentNode.children, cell);
+                    highlightColumn(index);
+                });
+    
+                cell.addEventListener('mouseout', function() {
+                    const index = Array.prototype.indexOf.call(cell.parentNode.children, cell);
+                    removeHighlightColumn(index);
+                });
+            });
+    
+            function highlightColumn(index) {
+                const rows = table.querySelectorAll('tr');
+                rows.forEach(row => {
+                    const cells = row.children;
+                    if (cells[index]) {
+                        cells[index].classList.add('highlight');
+                    }
+                });
+            }
+    
+            function removeHighlightColumn(index) {
+                const rows = table.querySelectorAll('tr');
+                rows.forEach(row => {
+                    const cells = row.children;
+                    if (cells[index]) {
+                        cells[index].classList.remove('highlight');
+                    }
+                });
+            }
+        });
+         const slideTexts = [
+             "AI script engine \n Build your story scenes",
+             "High Quality Avator Model \n Designed for Mobile & Large screen   ",
+            "AI Animation Engine \n Bring your image alive  ",
+            "AI media engine \n Synthesize your content",
+        ];
+
+        let slideIndex = 3;
+        let activeIndex =3
+        let timeout = 10000;
+        const slides = document.querySelectorAll('.slide');
+        const totalSlides = slides.length;
+        const playerElement = document.getElementById('introVideo');
+        let player =0;
+
+        function onYouTubeIframeAPIReady() {
+            player = new YT.Player('introVideo', {
+                events: {
+                    'onReady': onPlayerReady,
+                    'onStateChange': onPlayerStateChange
+                }
+            });
+
+            function onPlayerReady(event) {
+                // Ensure player starts only when the slide is active
+                showSlides();
+            }
+
+            function onPlayerStateChange(event) {
+                if (event.data == YT.PlayerState.ENDED) {
+                    // Do something when video ends
+                }
+            }
+
+            function playVideo() {
+                if (slideIndex === activeIndex) { // Assuming this is the video slide index
+                    player.seekTo(0, true); // Seek to the beginning of the video
+                    player.playVideo();
+                } else {
+                    player.pauseVideo();
+                }
+            }
+        }
+
+        function showSlides() {
+            slides.forEach((slide, index) => {
+                slide.classList.remove('active');
+                if (index === slideIndex) {
+                    slide.classList.add('active');
+                    typeEffect(slide.querySelector('.slide-text'), slideTexts[slideIndex]);
+
+                    // Control video playback
+                    if (playerElement && slideIndex === activeIndex) { // Slide index where the video is located
+                        player.seekTo(0, true); // Seek to the beginning of the video
+                        player.playVideo();
+                    }
+                    else
+                        player.pauseVideo();
+
+
+                }
+            });
+            slideIndex = (slideIndex + 1) % totalSlides;
+            if (slideIndex == 0)
+                timeout = 10000;
+            else
+                timeout = 9000;
+
+            console.log("timeout:" + timeout);
+            setTimeout(showSlides, timeout); // Change image every 6 seconds
+        }
+
+
+        function typeEffect(element, text) {
+            element.innerHTML = ''; // Clear existing content
+            const lines = text.split('\n'); // Split text into lines
+            let lineIndex = 0;
+            let charIndex = 0;
+            const speed = 100; // Speed of typing effect in milliseconds
+
+            function typeWriter() {
+                if (lineIndex < lines.length) {
+                    if (charIndex < lines[lineIndex].length) {
+                        element.innerHTML += lines[lineIndex].charAt(charIndex);
+                        charIndex++;
+                        setTimeout(typeWriter, speed);
+                    } else {
+                        element.innerHTML += '<br>'; // Add line break
+                        lineIndex++;
+                        charIndex = 0;
+                        setTimeout(typeWriter, speed);
+                    }
+                }
+            }
+            typeWriter();
+        }
+
+        //showSlides();
+         // Load YouTube IFrame Player API asynchronously
+         var tag = document.createElement('script');
+        tag.src = "https://www.youtube.com/iframe_api";
+        var firstScriptTag = document.getElementsByTagName('script')[0];
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+    </script>
+</body>
+</html>
