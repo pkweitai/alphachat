@@ -45,11 +45,6 @@ global agent
         #vectorstore=add_transcripts_to_vectorstore()
         #agent=initRag(vectorstore)
 global gcid, gsecret
-gcid = '531851985958-g9slu08inbos75s6hnbd5kshjim2t8q4.apps.googleusercontent.com'
-        #gcid = '900444443239-s7pak5u6tcfe2pg1l7eklkajsrvegru5.apps.googleusercontent.com'  #test
-
-gsecret = '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'
-        #gsecret = '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' #test
 
 LLM_AGENT: Optional[AiAgents] = None  # Initialize agent as None
 LLM_AGENT_ALPHA: Optional[AiAgents] = None  # Initialize agent as None
@@ -1192,14 +1187,7 @@ if __name__ == '__main__':
         init_chatdb()
 
        
-        google_bp = make_google_blueprint(client_id=gcid,
-                                        client_secret=gsecret,
-                                        redirect_to='google_login',
-                                        scope=SCOPES,
-                                        offline=True,
-                                        reprompt_consent=True)
-        app.register_blueprint(google_bp, url_prefix="/login")
-    
+        
         #Chat AI Loop
         main_ev_loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
         main_ev_loop.run_until_complete(initAgent())  # Await the initialization of the agent
