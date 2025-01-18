@@ -99,10 +99,10 @@ app.config['ADMIN_PASSWORD'] = 'qqqq'  # Store the admin password securely
 JIRA_URL = "https://nuwa-ai.atlassian.net"
 JIRA_USER = "chingrex60@gmail.com"
 JIRA_API_TOKEN = "ATATT3xFfGF0KVOcmyjfn_cekLgdjiB9nZa486u7G4r2Bx64mGv9GG-AYZhtHymuo2ec_16BlKkNyLju8eY2QPo6_X_f09DqzQhRruM243Ehsofc4xs3TKBPOEZImGELAiHdfKIj3bGZGsLwoiD81wwhVfJpU8tsqkxPPkqVoPeBm58k8Y582Ls=BF02C87F"
-JIRA_PROJECT = "demo"
+JIRA_PROJECT = "KAN"
 
 # Vectorstore location
-VECTORSTORE_FILE_PATH = "./vector/jira_tickets.db"
+VECTORSTORE_JIRA_FILE_PATH = "./vector/jira_tickets.db"
 
 # Initialize JIRA API
 jira = Jira(
@@ -113,20 +113,31 @@ jira = Jira(
 
 def fetch_jira_tickets():
     """ Fetch JIRA tickets and return as a list of dictionaries """
-    jql_query = f'project={JIRA_PROJECT} ORDER BY created DESC'
-    tickets = jira.jql(jql_query, limit=50)  # Fetch latest 50 tickets
-    
-    ticket_data = []
-    for issue in tickets.get('issues', []):
-        ticket_data.append({
-            "id": issue["key"],
-            "summary": issue["fields"]["summary"],
-            "description": issue["fields"].get("description", "No description"),
-            "status": issue["fields"]["status"]["name"],
-            "created": issue["fields"]["created"]
-        })
 
-    return ticket_data
+    JIRA_PROJECT = "KAN"  # Replace with the correct project key
+
+    try:
+        jql_query = f'project={JIRA_PROJECT} ORDER BY created DESC'
+        tickets = jira.jql(jql_query, limit=50)  # Fetch latest 50 tickets
+
+        if "issues" not in tickets:
+            return {"error": "Invalid JIRA response. Check project key and permissions."}
+
+        ticket_data = []
+        for issue in tickets.get("issues", []):
+            ticket_data.append({
+                "id": issue["key"],
+                "summary": issue["fields"]["summary"],
+                "status": issue["fields"]["status"]["name"],
+                "created": issue["fields"]["created"],
+                "description": issue["fields"].get("description", "No description available"),
+            })
+
+        return ticket_data
+
+    except Exception as e:
+        return {"error": f"Failed to fetch JIRA tickets: {str(e)}"}
+
 
 def create_rag_on_jira():
     """ Extract ticket data and store in a vector database for RAG """
@@ -1122,23 +1133,57 @@ def get_prompt():
 
     return jsonify({"prompt": row[0] if row else ""})
 
+def check_jira_issues(user_message):
+    """ Check if the user's issue is a known issue in the JIRA database. """
+
+    # Load vectorstore without embedding in __init__
+    vectorstore = Chroma(persist_directory=VECTORSTORE_JIRA_FILE_PATH)
+
+    # Use retriever with embeddings
+    retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 3})
+    
+    query = f"Find known issues related to: {user_message}"
+    response = retriever.get_relevant_documents(query)
+
+    if response:
+        issue = response[0].page_content  # Extract relevant JIRA issue
+        return {"id": "JIRA-XXX", "status": "Open", "description": issue}  # Example response
+    else:
+        return None  # No matching JIRA ticket found
 
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    message = request.json.get('message')
-    agent = request.json.get('agent')
+    data = request.json
+    message = data.get('message', '')
+    agent = data.get('agent', 'default')
 
     global main_ev_loop
 
-    print("agent----" ,agent)
+    print("Agent Selected:", agent)
     if agent == "alpha":
-        llmagent=LLM_AGENT_ALPHA
+        llmagent = LLM_AGENT_ALPHA
     else:
-        llmagent=LLM_AGENT
+        llmagent = LLM_AGENT
 
-    response=main_ev_loop.run_until_complete(llmagent.chat_with_agent(message))  # Await the initialization of the agent
+    # Check if the message is related to troubleshooting
+    if any(keyword in message.lower() for keyword in ["error", "issue", "problem", "not working", "bug", "stuck"]):
+        jira_issue = check_jira_issues(message)
+
+        if jira_issue:
+            response = {
+                "response": f"This issue is being tracked (JIRA Ticket **{jira_issue['id']}**). Status: {jira_issue['status']}. Suggested fix: {jira_issue['description']}."
+            }
+        else:
+            response = {
+                "response": "Try restarting your Telly and checking your internet connection. If the issue persists, visit [https://www.telly.com/support](https://www.telly.com/support)."
+            }
+    else:
+        # Process normal chat response
+        response = main_ev_loop.run_until_complete(llmagent.chat_with_agent(message))
+
     return jsonify(response)
+
 
 
 def save_trendingvideos_to_db(videos, trending_keyword):
