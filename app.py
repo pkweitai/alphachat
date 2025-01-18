@@ -10,12 +10,17 @@ import time
 import threading
 from youtube_transcript_api import YouTubeTranscriptApi
 from langchain import hub
+from atlassian import Jira
 from langchain_chroma import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_google_genai.chat_models import ChatGoogleGenerativeAI
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
+
+
+
+
 import socket
 import argparse
 import pandas as pd
@@ -87,6 +92,104 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['ADMIN_PASSWORD'] = 'qqqq'  # Store the admin password securely
 
 #socketio = SocketIO(app)
+
+#JIRA init
+
+# JIRA Credentials (Replace with your credentials)
+JIRA_URL = "https://nuwa-ai.atlassian.net"
+JIRA_USER = "chingrex60@gmail.com"
+JIRA_API_TOKEN = "ATATT3xFfGF0KVOcmyjfn_cekLgdjiB9nZa486u7G4r2Bx64mGv9GG-AYZhtHymuo2ec_16BlKkNyLju8eY2QPo6_X_f09DqzQhRruM243Ehsofc4xs3TKBPOEZImGELAiHdfKIj3bGZGsLwoiD81wwhVfJpU8tsqkxPPkqVoPeBm58k8Y582Ls=BF02C87F"
+JIRA_PROJECT = "demo"
+
+# Vectorstore location
+VECTORSTORE_FILE_PATH = "./vector/jira_tickets.db"
+
+# Initialize JIRA API
+jira = Jira(
+    url=JIRA_URL,
+    username=JIRA_USER,
+    password=JIRA_API_TOKEN
+)
+
+def fetch_jira_tickets():
+    """ Fetch JIRA tickets and return as a list of dictionaries """
+    jql_query = f'project={JIRA_PROJECT} ORDER BY created DESC'
+    tickets = jira.jql(jql_query, limit=50)  # Fetch latest 50 tickets
+    
+    ticket_data = []
+    for issue in tickets.get('issues', []):
+        ticket_data.append({
+            "id": issue["key"],
+            "summary": issue["fields"]["summary"],
+            "description": issue["fields"].get("description", "No description"),
+            "status": issue["fields"]["status"]["name"],
+            "created": issue["fields"]["created"]
+        })
+
+    return ticket_data
+
+def create_rag_on_jira():
+    """ Extract ticket data and store in a vector database for RAG """
+    tickets = fetch_jira_tickets()
+    
+    documents = []
+    for ticket in tickets:
+        content = f"ID: {ticket['id']}\nSummary: {ticket['summary']}\nStatus: {ticket['status']}\nDescription: {ticket['description']}\nCreated: {ticket['created']}"
+        documents.append(content)
+
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+    splits = text_splitter.split_text("\n\n".join(documents))
+
+    vectorstore = Chroma.from_texts(
+        texts=splits,
+        embedding=GoogleGenerativeAIEmbeddings(model="models/embedding-001"),
+        persist_directory=VECTORSTORE_FILE_PATH
+    )
+    
+    return vectorstore
+
+def search_jira_rag(query):
+    """ Search for relevant JIRA tickets using RAG """
+    vectorstore = Chroma(persist_directory=VECTORSTORE_FILE_PATH, embedding=GoogleGenerativeAIEmbeddings(model="models/embedding-001"))
+    retriever = vectorstore.as_retriever()
+
+    def format_docs(docs):
+        return "\n\n".join(docs)
+
+    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-001")
+    prompt = hub.pull("rlm/rag-prompt")
+    
+    rag_chain = (
+        {"context": retriever | format_docs, "question": RunnablePassthrough()}
+        | prompt
+        | llm
+        | StrOutputParser()
+    )
+
+    return rag_chain.invoke(query)
+
+@app.route('/fetch_jira', methods=['GET'])
+def api_fetch_jira():
+    tickets = fetch_jira_tickets()
+    return jsonify(tickets)
+
+@app.route('/build_jira_rag', methods=['POST'])
+def api_build_rag():
+    vectorstore = create_rag_on_jira()
+    return jsonify({"message": "JIRA RAG database built successfully."})
+
+@app.route('/query_jira', methods=['POST'])
+def api_query_jira():
+    data = request.json
+    query = data.get('query', '')
+
+    if not query:
+        return jsonify({"error": "Query parameter is required."}), 400
+
+    response = search_jira_rag(query)
+    return jsonify({"response": response})
+
+
 
 db.init_app(app)
 login_manager = LoginManager()
@@ -1202,7 +1305,7 @@ if __name__ == '__main__':
             app.run(debug=False, host='0.0.0.0', port=5643)
         else:
             # Development mode settings
-            #app.run(debug=True, host='0.0.0.0', port=80)
-            app.run(ssl_context=('cert.pem', 'key.pem') ,debug=True,host='0.0.0.0', port=8888)
+            app.run(debug=True, host='0.0.0.0', port=8888)
+            #app.run(ssl_context=('cert.pem', 'key.pem') ,debug=True,host='0.0.0.0', port=8888)
 
             
