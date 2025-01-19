@@ -98,7 +98,7 @@ app.config['ADMIN_PASSWORD'] = 'qqqq'  # Store the admin password securely
 # JIRA Credentials (Replace with your credentials)
 JIRA_URL = "https://nuwa-ai.atlassian.net"
 JIRA_USER = "chingrex60@gmail.com"
-JIRA_API_TOKEN = "ATATT3xFfGF09yl0quRVmrfZ9J6DBP0NoLsinU5HECOVVm14p_dwv3e3r2R9IeE8fxB25mblgzpB2i_o0DZJUt3nGBtzWA9OwIQSHVU1pAz3G-4TXo_OQyAYwb5MCvvlwMMXSxnOjbof0XtxzI9c1yGTR-S4KJqHhW-6IDBUvbYryGLiypsb-xo=B7372F61" 
+JIRA_API_TOKEN = os.getenv("JIRA_TOKEN")
 JIRA_PROJECT = "KAN"
 
 # Vectorstore location
@@ -138,66 +138,74 @@ def fetch_jira_tickets():
     except Exception as e:
         return {"error": f"Failed to fetch JIRA tickets: {str(e)}"}
 
-
 def create_rag_on_jira():
     """ Extract ticket data and store in a vector database for RAG """
     tickets = fetch_jira_tickets()
-    
+
+    # Create document objects properly
     documents = []
     for ticket in tickets:
         content = f"ID: {ticket['id']}\nSummary: {ticket['summary']}\nStatus: {ticket['status']}\nDescription: {ticket['description']}\nCreated: {ticket['created']}"
-        documents.append(content)
+        documents.append(Document(content=content, metadata={"id": ticket["id"], "status": ticket["status"]}))
 
     print(documents)
 
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-    splits = text_splitter.split_text("\n\n".join(documents))
+    splits = text_splitter.split_documents(documents)  # Using `split_documents` instead of `split_text`
 
     vectorstore = Chroma.from_documents(
-        documents=[
-            Document(page_content=issue["summary"], metadata={"id": issue["id"], "status": issue["status"]})
-            for issue in issues
-        ],
+        documents=splits,
         embedding=GoogleGenerativeAIEmbeddings(model="models/embedding-001"),
         persist_directory=VECTORSTORE_FILE_PATH
     )
 
-    
     return vectorstore
 
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from langchain_chroma import Chroma
+
+from google.generativeai import configure, embed_content
+# Configure Google Generative AI
+configure(api_key=os.getenv("GOOGLE_API_KEY"))  # Ensure API key is set in the environment
+
+class GoogleAIEmbeddings:
+    """Wrapper class to make Google Generative AI embeddings compatible with Chroma"""
+    
+    def embed_query(self, query):
+        """Generates an embedding for a single query"""
+        response = embed_content(model="models/embedding-001", content=query)
+        return response["embedding"] if response else None
+
+    def embed_documents(self, texts):
+        """Generates embeddings for a list of documents"""
+        return [self.embed_query(text) for text in texts]
 
 def search_jira_rag(query):
-    """ Search for relevant JIRA tickets using RAG """
+    """ Search for relevant JIRA tickets using RAG from ChromaDB """
 
-    # Define embedding function
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    # Load vector store
+    embeddings = GoogleAIEmbeddings()
+    vectorstore = Chroma(persist_directory=VECTORSTORE_FILE_PATH, embedding_function=embeddings)
 
-    # Load vector store with embedding function
-    vectorstore = Chroma(persist_directory=VECTORSTORE_JIRA_FILE_PATH, embedding_function=embeddings)
-
-    # Ensure retriever is correctly set up
+    # Set up retriever
     retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 5})
 
-    def format_docs(docs):
-        return "\n\n".join([doc.page_content for doc in docs])
+    # Retrieve documents
+    print(f"🔍 Searching for: {query}")
+    retrieved_docs = retriever.get_relevant_documents(query)
+    print(f"📌 Retrieved {len(retrieved_docs)} documents for query: {query}")
 
-    # Load the language model
-    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-001")
-    prompt = hub.pull("rlm/rag-prompt")
+    # Convert Documents to JSON serializable format
+    formatted_docs = [
+        {
+            "content": doc.page_content,
+            "metadata": doc.metadata
+        }
+        for doc in retrieved_docs
+    ]
 
-    # Define the retrieval-augmented generation (RAG) chain
-    rag_chain = (
-        {"context": retriever | format_docs, "question": RunnablePassthrough()}
-        | prompt
-        | llm
-        | StrOutputParser()
-    )
+    if not formatted_docs:
+        return {"error": "⚠️ No relevant JIRA tickets found in ChromaDB."}
 
-    return rag_chain.invoke(query)
-    
-
+    return formatted_docs  # JSON serializable list of dictionaries
 
 @app.route('/fetch_jira', methods=['GET'])
 def api_fetch_jira():
@@ -217,8 +225,10 @@ def api_query_jira():
     if not query:
         return jsonify({"error": "Query parameter is required."}), 400
 
-    response = search_jira_rag(query)
-    return jsonify({"response": response})
+    response = search_jira_rag(query)  # This now returns a list of dictionaries
+
+    return jsonify({"response": response})  # Now JSON serializable
+
 
 
 
