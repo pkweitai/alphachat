@@ -7,6 +7,16 @@ AlphaChat is an AI-powered chatbot integrated with JIRA RAG-based retrieval and 
 
 ---
 
+## 📑 Table of Contents
+1. [Installation Guide](#-installation-guide)
+2. [Running the Application](#-running-the-application)
+3. [API Endpoints](#-api-endpoints)
+4. [Project Roadmap](#-project-roadmap)
+5. [Troubleshooting](#-troubleshooting)
+6. [Contributors](#-contributors)
+
+---
+
 ## 🚀 Installation Guide
 
 ### **1️⃣ Install Conda**
