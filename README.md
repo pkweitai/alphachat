@@ -7,6 +7,16 @@ AlphaChat is an AI-powered chatbot integrated with JIRA RAG-based retrieval and 
 
 ---
 
+## 📑 Table of Contents
+1. [Installation Guide](#-installation-guide)
+2. [Running the Application](#-running-the-application)
+3. [API Endpoints](#-api-endpoints)
+4. [Project Roadmap](#-project-roadmap)
+5. [Troubleshooting](#-troubleshooting)
+6. [Contributors](#-contributors)
+
+---
+
 ## 🚀 Installation Guide
 
 ### **1️⃣ Install Conda**
@@ -108,6 +118,40 @@ curl -X POST http://127.0.0.1:8888/chat -H "Content-Type: application/json" -d '
 
 ---
 
+## 🚀 Project Roadmap
+
+### 🎯 Slot Filling
+- Implement structured slot-filling for contextual AI conversations.
+- Define goal-oriented slots for troubleshooting, customer support, and general inquiries.
+- Ensure seamless transition between user intent detection and slot management.
+
+### 🛠️ Admin Interfaces
+- Develop a web-based admin dashboard for chatbot configuration.
+- Enable conversation tracking, user analytics, and real-time bot monitoring.
+- Provide role-based access control (RBAC) for different admin levels.
+
+### 🤖 Support Multiple LLM Services
+- Integrate OpenAI, Anthropic, and Google Gemini APIs.
+- Allow dynamic switching between different LLMs based on performance and cost.
+- Provide failover mechanisms for improved uptime and reliability.
+
+### 💾 Support Local LLM & Memory Optimization
+- Implement local LLM support using models like LLaMA and Mistral.
+- Optimize memory usage for efficient inference on edge devices.
+- Enable quantization techniques to reduce model footprint.
+
+### 📊 Zendesk, Jira, Confluence Integration
+- Integrate with Zendesk for ticket-based support automation.
+- Expand JIRA integration for deeper issue tracking and resolution.
+- Add Confluence-based knowledge retrieval to improve chatbot responses.
+
+### 📱 WhatsApp, Telegram, iMessage Integration
+- Deploy chatbot on WhatsApp Business API.
+- Enable Telegram bot with webhook-based real-time communication.
+- Support Apple iMessage integration for seamless user engagement.
+
+---
+
 ## ✅ Troubleshooting
 | **Issue** | **Solution** |
 |-----------|-------------|
@@ -125,3 +169,4 @@ curl -X POST http://127.0.0.1:8888/chat -H "Content-Type: application/json" -d '
 ---
 
 Now, you're ready to **build and run AlphaChat with ngrok! 🚀🔥**
+
