@@ -98,7 +98,7 @@ app.config['ADMIN_PASSWORD'] = 'qqqq'  # Store the admin password securely
 # JIRA Credentials (Replace with your credentials)
 JIRA_URL = "https://nuwa-ai.atlassian.net"
 JIRA_USER = "chingrex60@gmail.com"
-JIRA_API_TOKEN = "ATATT3xFfGF0KVOcmyjfn_cekLgdjiB9nZa486u7G4r2Bx64mGv9GG-AYZhtHymuo2ec_16BlKkNyLju8eY2QPo6_X_f09DqzQhRruM243Ehsofc4xs3TKBPOEZImGELAiHdfKIj3bGZGsLwoiD81wwhVfJpU8tsqkxPPkqVoPeBm58k8Y582Ls=BF02C87F"
+JIRA_API_TOKEN = "ATATT3xFfGF09yl0quRVmrfZ9J6DBP0NoLsinU5HECOVVm14p_dwv3e3r2R9IeE8fxB25mblgzpB2i_o0DZJUt3nGBtzWA9OwIQSHVU1pAz3G-4TXo_OQyAYwb5MCvvlwMMXSxnOjbof0XtxzI9c1yGTR-S4KJqHhW-6IDBUvbYryGLiypsb-xo=B7372F61" 
 JIRA_PROJECT = "KAN"
 
 # Vectorstore location
@@ -117,7 +117,7 @@ def fetch_jira_tickets():
     JIRA_PROJECT = "KAN"  # Replace with the correct project key
 
     try:
-        jql_query = f'project={JIRA_PROJECT} ORDER BY created DESC'
+        jql_query = f'project="{JIRA_PROJECT}" ORDER BY created DESC'
         tickets = jira.jql(jql_query, limit=50)  # Fetch latest 50 tickets
 
         if "issues" not in tickets:
@@ -148,28 +148,46 @@ def create_rag_on_jira():
         content = f"ID: {ticket['id']}\nSummary: {ticket['summary']}\nStatus: {ticket['status']}\nDescription: {ticket['description']}\nCreated: {ticket['created']}"
         documents.append(content)
 
+    print(documents)
+
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
     splits = text_splitter.split_text("\n\n".join(documents))
 
-    vectorstore = Chroma.from_texts(
-        texts=splits,
+    vectorstore = Chroma.from_documents(
+        documents=[
+            Document(page_content=issue["summary"], metadata={"id": issue["id"], "status": issue["status"]})
+            for issue in issues
+        ],
         embedding=GoogleGenerativeAIEmbeddings(model="models/embedding-001"),
         persist_directory=VECTORSTORE_FILE_PATH
     )
+
     
     return vectorstore
 
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_chroma import Chroma
+
 def search_jira_rag(query):
     """ Search for relevant JIRA tickets using RAG """
-    vectorstore = Chroma(persist_directory=VECTORSTORE_FILE_PATH, embedding=GoogleGenerativeAIEmbeddings(model="models/embedding-001"))
-    retriever = vectorstore.as_retriever()
+
+    # Define embedding function
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+
+    # Load vector store with embedding function
+    vectorstore = Chroma(persist_directory=VECTORSTORE_JIRA_FILE_PATH, embedding_function=embeddings)
+
+    # Ensure retriever is correctly set up
+    retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 5})
 
     def format_docs(docs):
-        return "\n\n".join(docs)
+        return "\n\n".join([doc.page_content for doc in docs])
 
+    # Load the language model
     llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-001")
     prompt = hub.pull("rlm/rag-prompt")
-    
+
+    # Define the retrieval-augmented generation (RAG) chain
     rag_chain = (
         {"context": retriever | format_docs, "question": RunnablePassthrough()}
         | prompt
@@ -178,6 +196,8 @@ def search_jira_rag(query):
     )
 
     return rag_chain.invoke(query)
+    
+
 
 @app.route('/fetch_jira', methods=['GET'])
 def api_fetch_jira():
@@ -1136,20 +1156,24 @@ def get_prompt():
 def check_jira_issues(user_message):
     """ Check if the user's issue is a known issue in the JIRA database. """
 
-    # Load vectorstore without embedding in __init__
-    vectorstore = Chroma(persist_directory=VECTORSTORE_JIRA_FILE_PATH)
+    # Load vectorstore and explicitly specify the embedding model
+    vectorstore = Chroma(
+        persist_directory=VECTORSTORE_FILE_PATH, 
+        embedding_function=GoogleGenerativeAIEmbeddings(model="models/embedding-001")  # Ensure embeddings are provided
+    )
 
     # Use retriever with embeddings
     retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": 3})
-    
+
     query = f"Find known issues related to: {user_message}"
-    response = retriever.get_relevant_documents(query)
+    response = retriever.invoke(query)  # Use invoke instead of deprecated method
 
     if response:
         issue = response[0].page_content  # Extract relevant JIRA issue
         return {"id": "JIRA-XXX", "status": "Open", "description": issue}  # Example response
     else:
         return None  # No matching JIRA ticket found
+
 
 
 @app.route('/chat', methods=['POST'])
