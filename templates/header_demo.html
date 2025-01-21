@@ -114,27 +114,59 @@
     chatMessages.scrollTop = chatMessages.scrollHeight;
 
     // Send the message to the server via HTTP POST
-    fetch('/chat', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ message: message })
-    })
-    .then(response => response.json())
-    .then(data => {
-        // Display the response message in the chat window
-        const responseElement = document.createElement('div');
-        responseElement.classList.add('chat-widget-message', 'server');
-        responseElement.innerHTML = data.msg;  // Use innerHTML to render HTML response
-        chatMessages.appendChild(responseElement);
+// Send the message to the server via HTTP POST
+fetch('/chat', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ message: message })
+})
+.then(response => response.json())
+.then(data => {
+    // Ensure response exists
+    let serverMessage = data.response || "No response from server.";
 
-        // Scroll to the bottom of the chat messages
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-    })
-    .catch(error => {
-        console.error('Error:', error);
-    });
+    // Corrected regex to extract JIRA issue details (escaping ** properly)
+    let jiraRegex = /JIRA Ticket \*\*(.*?)\*\*\)\. Status: (.*?)\. Suggested fix: (.*)/s;
+    let jiraMatch = serverMessage.match(jiraRegex);
+
+    let formattedResponse;
+    if (jiraMatch) {
+        let ticketId = jiraMatch[1].trim();
+        let status = jiraMatch[2].trim();
+        let suggestedFix = jiraMatch[3].trim();
+
+        // Format as readable HTML
+        formattedResponse = `
+            <div class="jira-ticket">
+                <strong>🚀 JIRA Issue Found:</strong><br>
+                <b>Ticket ID:</b> ${ticketId}<br>
+                <b>Status:</b> ${status}<br>
+                <b>Suggested Fix:</b> 
+                <li>${suggestedFix.replace(/\n/g, "<br>")}
+            </div>
+        `;
+    } else {
+        // Default text formatting for general responses
+        formattedResponse = `<div class="chat-message">${serverMessage.replace(/\n/g, "<br>")}</div>`;
+    }
+
+    // Display the formatted response in the chat window
+    const responseElement = document.createElement('div');
+    responseElement.classList.add('chat-widget-message', 'server');
+    responseElement.innerHTML = formattedResponse;
+    chatMessages.appendChild(responseElement);
+
+    // Scroll to the bottom of the chat messages
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+})
+.catch(error => {
+    console.error('Error:', error);
+});
+
+
+
 }
 
 
