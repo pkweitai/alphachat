@@ -163,7 +163,7 @@ curl -X POST http://127.0.0.1:8888/chat -H "Content-Type: application/json" -d '
 ---
 
 ## 📌 Contributors
-- **Your Name** (@yourgithub)
+- **Alpha AI Team
 - **Contributors Welcome!**
 
 ---
