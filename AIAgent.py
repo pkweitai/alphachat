@@ -1,28 +1,19 @@
-import argparse
-from decimal import Decimal
-import os
-import json
+
 import inspect
 from langchain_core.runnables import RunnableSequence
-from langchain_openai.chat_models import ChatOpenAI
 from langchain_google_genai.chat_models import ChatGoogleGenerativeAI
-from langchain_community.chat_models.ollama import ChatOllama
-import pandas as pd
-import aiohttp
-import asyncio
+
 
 from typing import Dict, List, Callable
-
 from hummingbot_ai.user_intent_classifier import classify_user_intent_chain, UserIntent
 from hummingbot_ai.user_generalchat import response_user_generalchat
-from hummingbot_ai.user_actiondetect import response_user
 
 class AiAgents:
     async def setup(self) -> None:
         #if cmdline_args.ollama:
         #    llm = ChatOllama(model="llama3:70b")
         #elif cmdline_args.google:
-        llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-001")
+        llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash-lite")
         #else:
         #    llm = ChatOpenAI(temperature=0.0)
 
@@ -46,8 +37,9 @@ class AiAgents:
 
         if isinstance(status, str):
             print("dispatch str: " , status)
-            res=f"make a human friendly message for 'based on user input :{user_input}, the detected intent: {intent} , and hummingbot result:  {status}, repeat all parameters precisely, no need ask question to confirm. Do not repeat the intent, classification and user questions. Make simple response \n'"
-            humanreadables : str = await self.chatchain.ainvoke({"message": res})
+            #res=f"make a human friendly message for 'based on user input :{user_input}, the detected intent: {intent} , and hummingbot result:  {status}, repeat all parameters precisely, no need ask question to confirm. Do not repeat the intent, classification and user questions. Make simple response \n'"
+            #humanreadables : str = await self.chatchain.ainvoke({"message": res})
+            humanreadables : str = status
             return humanreadables
         
         elif isinstance(status, dict):

@@ -1,43 +1,13 @@
-from flask import Flask, render_template, request, redirect, url_for, send_from_directory, jsonify, abort, session,send_file,flash
-from pytrends.request import TrendReq
+from flask import Flask, render_template, request, redirect, url_for, jsonify
 import asyncio
 import nest_asyncio
-import glob, json, shutil
 import sqlite3
 import os
-import requests
-import time
-import threading
-from youtube_transcript_api import YouTubeTranscriptApi
-from langchain import hub
-from atlassian import Jira
-from langchain_chroma import Chroma
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from langchain_google_genai.chat_models import ChatGoogleGenerativeAI
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough
 
 
-
-
-import socket
 import argparse
-import pandas as pd
-from flask_dance.contrib.google import make_google_blueprint, google
-from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user, logout_user
-from models import db, User,add_user
-from flask_dance.contrib.google import make_google_blueprint, google
-from flask_migrate import Migrate
-from flask_socketio import SocketIO, emit
-import base64
-from datetime import datetime, timedelta
-
-
-
-
+from models import db,add_user
 from typing import Optional
-from typing import Dict
 from AIAgent import AiAgents  as AiAgents # Ensure this import is correct
 
 
@@ -94,154 +64,6 @@ app.config['ADMIN_PASSWORD'] = 'qqqq'  # Store the admin password securely
 #socketio = SocketIO(app)
 db.init_app(app)
 
-#JIRA init
-
-# JIRA Credentials (Replace with your credentials)
-JIRA_URL = "https://nuwa-ai.atlassian.net"
-JIRA_USER = "chingrex60@gmail.com"
-JIRA_API_TOKEN = os.getenv("JIRA_TOKEN")
-JIRA_PROJECT = "KAN"
-
-# Vectorstore location
-VECTORSTORE_JIRA_FILE_PATH = "./vector/jira_tickets.db"
-
-# Initialize JIRA API
-jira = Jira(
-    url=JIRA_URL,
-    username=JIRA_USER,
-    password=JIRA_API_TOKEN
-)
-
-def fetch_jira_tickets():
-    """ Fetch JIRA tickets and return as a list of dictionaries """
-
-    JIRA_PROJECT = "KAN"  # Replace with the correct project key
-
-    try:
-        jql_query = f'project="{JIRA_PROJECT}" ORDER BY created DESC'
-        tickets = jira.jql(jql_query, limit=50)  # Fetch latest 50 tickets
-
-        if "issues" not in tickets:
-            return {"error": "Invalid JIRA response. Check project key and permissions."}
-
-        ticket_data = []
-        for issue in tickets.get("issues", []):
-            ticket_data.append({
-                "id": issue["key"],
-                "summary": issue["fields"]["summary"],
-                "status": issue["fields"]["status"]["name"],
-                "created": issue["fields"]["created"],
-                "description": issue["fields"].get("description", "No description available"),
-            })
-
-        return ticket_data
-
-    except Exception as e:
-        return {"error": f"Failed to fetch JIRA tickets: {str(e)}"}
-
-def create_rag_on_jira():
-    """ Extract ticket data and store in a vector database for RAG """
-
-    tickets = fetch_jira_tickets()
-    documents = []
-
-    for ticket in tickets:
-        # Include explicit metadata in embeddings
-        content = f"""
-        ID: {ticket['id']}
-        Summary: {ticket['summary']}
-        Status: {ticket['status']}
-        Description: {ticket['description']}
-        Keywords: {ticket['summary']} {ticket['status']} {ticket['description']}
-        Created: {ticket['created']}
-        """
-
-        documents.append(Document(content=content, metadata={"id": ticket["id"], "status": ticket["status"]}))
-
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-    splits = text_splitter.split_documents(documents)
-
-    vectorstore = Chroma.from_documents(
-        documents=splits,
-        embedding=GoogleGenerativeAIEmbeddings(model="models/embedding-001"),
-        persist_directory=VECTORSTORE_FILE_PATH
-    )
-
-    return vectorstore
-
-
-from google.generativeai import configure, embed_content
-# Configure Google Generative AI
-configure(api_key=os.getenv("GOOGLE_API_KEY"))  # Ensure API key is set in the environment
-
-class GoogleAIEmbeddings:
-    """Wrapper class to make Google Generative AI embeddings compatible with Chroma"""
-    
-    def embed_query(self, query):
-        """Generates an embedding for a single query"""
-        response = embed_content(model="models/embedding-001", content=query)
-        return response["embedding"] if response else None
-
-    def embed_documents(self, texts):
-        """Generates embeddings for a list of documents"""
-        return [self.embed_query(text) for text in texts]
-
-def search_jira_rag(query, similarity_threshold=0.7):
-    """ Search for relevant JIRA tickets using RAG from ChromaDB with strict keyword filtering """
-
-    # Load vector store
-    embeddings = GoogleAIEmbeddings()
-    vectorstore = Chroma(persist_directory=VECTORSTORE_FILE_PATH, embedding_function=embeddings)
-
-    # Perform similarity search and get scores
-    retrieved_docs_with_scores = vectorstore.similarity_search_with_score(query, k=10)  # Fetch more results to filter
-
-    # Apply similarity threshold **and strict keyword matching**
-    relevant_docs = []
-    for doc, score in retrieved_docs_with_scores:
-        content_lower = doc.page_content.lower()
-        query_lower = query.lower()
-
-        # Ensure similarity score is above threshold AND the query is inside the content
-        if score >= similarity_threshold or query_lower in content_lower:
-            relevant_docs.append({
-                "content": doc.page_content,
-                "metadata": doc.metadata,
-                "score": score
-            })
-
-    print(f"🔍 Searching for: {query}")
-    print(f"📌 Retrieved {len(relevant_docs)} relevant documents above threshold {similarity_threshold}")
-
-    if not relevant_docs:
-        return {"error": "⚠️ No relevant JIRA tickets found in ChromaDB."}
-
-    return relevant_docs  # Return only filtered results
-
-
-
-@app.route('/fetch_jira', methods=['GET'])
-def api_fetch_jira():
-    tickets = fetch_jira_tickets()
-    return jsonify(tickets)
-
-@app.route('/build_jira_rag', methods=['POST'])
-def api_build_rag():
-    vectorstore = create_rag_on_jira()
-    return jsonify({"message": "JIRA RAG database built successfully."})
-
-@app.route('/query_jira', methods=['POST'])
-def api_query_jira():
-    data = request.json
-    query = data.get('query', '')
-
-    if not query:
-        return jsonify({"error": "Query parameter is required."}), 400
-
-    response = search_jira_rag(query)  # This now returns a list of dictionaries
-
-    return jsonify({"response": response})  # Now JSON serializable
-
 
 
 
@@ -260,16 +82,6 @@ def mainpage():
         #return render_template('main.html')
         return render_template('demo.html')
 
-
-# AI Chatbot
-
-#@socketio.on('send_message')
-#def handle_send_message(json):
-#    global LLM_AGENT
-#    message = json['message']
-#    response=message
-#    print(response)
-#    emit('receive_message', {'response': response})
 
 
 async def initAgent():
@@ -315,26 +127,6 @@ def get_prompt():
 
     return jsonify({"prompt": row[0] if row else ""})
 
-def check_jira_issues(user_message):
-    """ Check if the user's issue is a known issue in JIRA using RAG-based retrieval """
-
-    jira_issues = search_jira_rag(user_message)  # Directly call the RAG search function
-
-    if isinstance(jira_issues, dict) and "error" in jira_issues:
-        return None  # No relevant JIRA tickets found or an error occurred
-
-    if jira_issues:
-        top_issue = jira_issues[0]  # Assuming the first result is the most relevant
-        return {
-            "id": top_issue.get("metadata", {}).get("id", "Unknown"),
-            "status": top_issue.get("metadata", {}).get("status", "Unknown"),
-            "description": top_issue.get("content", "No description available")
-        }
-    print*("No issues queried")
-    return None  # No relevant issues found
-
-
-
 @app.route('/chat', methods=['POST'])
 def chat():
     data = request.json
@@ -349,21 +141,7 @@ def chat():
     else:
         llmagent = LLM_AGENT
 
-    # Check if the message is related to troubleshooting
-    if any(keyword in message.lower() for keyword in ["error", "issue", "problem", "not working", "bug", "stuck"]):
-        jira_issue = check_jira_issues(message)
-
-        if jira_issue:
-            response = {
-                "response": f"This issue is being tracked (JIRA Ticket **{jira_issue['id']}**). Status: {jira_issue['status']}. Suggested fix: {jira_issue['description']}."
-            }
-        else:
-            response = {
-                "response": "Try restarting your Telly and checking your internet connection. If the issue persists, visit [https://www.telly.com/support](https://www.telly.com/support)."
-            }
-    else:
-        # Process normal chat response
-        response = main_ev_loop.run_until_complete(llmagent.chat_with_agent(message))
+    response = main_ev_loop.run_until_complete(llmagent.chat_with_agent(message))
 
     print(response)
     return response 
