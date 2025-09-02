@@ -1,5 +1,5 @@
 bundle: app
-date:   20250901-194838
+date:   20250901-200959
 cipher: aes-256-cbc
 src:    /Users/rex/app/service/alphachat/data/js
 
@@ -9,8 +9,8 @@ src:    /Users/rex/app/service/alphachat/data/js
 ./checkin_flow.json
 
 # sha256(zip):
-105bbc294592bb327fb9f3c2aabad2aa39eed60179bb36db7623f757696e742c  app.zip
+80e390e5210f849ef70979557b83946b8128acca43b1d4814567436ae8dc7278  app.zip
 
 # sha256(enc):
-5e6316e753f7de383b9b07d12fd4690bdb3e0b205a2ae11b6224929b4d1455e6  app.zip.enc
+be37f4a744fdbb4628584fb60bade650c56a6bca82c32487b1216f63cc866368  app.zip.enc
 # size(enc): 0.01 MB
