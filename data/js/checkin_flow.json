@@ -9,6 +9,15 @@
     ]
   },
 
+  "S0a": {
+  "q": "Welcome back! Want to keep tracking your current goal, or change it?",
+  "answers": [
+    { "a": "✅ Continue with current goal", "react": "Great — keeping momentum.", "next": "S1a", "score": 0 },
+    { "a": "🔄 Change my goal", "react": "No problem — let’s pick a new one.", "next": "START", "score": 0 }
+  ]
+  },
+
+
   "S1a": {
     "q": "Quick vibe check—how’s your mood right now?",
     "answers": [
